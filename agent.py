@@ -29,13 +29,20 @@ def fetch_arxiv_papers(query):
 
 def summarize_and_translate(text):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-    prompt = f"قم بترجمة هذا الملخص العلمي إلى اللغة العربية الفصحى وقم بتلخيصه في 3 نقاط رئيسية واضحة (المشكلة، المنهجية، النتائج):\n\n{text}"
+    prompt = "قم بترجمة هذا الملخص العلمي إلى اللغة العربية الفصحى وقم بتلخيصه في 3 نقاط رئيسية واضحة (المشكلة، المنهجية، النتائج):\n\n" + text
     
     payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": prompt
+                    }
+                ]
+            }
+        ]
     }
+    
     response = requests.post(url, json=payload)
     if response.status_code == 200:
         try:
@@ -49,4 +56,33 @@ def summarize_and_translate(text):
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
-        "chat_id": TELEGRAM
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": message
+    }
+    response = requests.post(url, json=payload)
+    if response.status_code == 200:
+        print("تم إرسال الرسالة إلى تليجرام بنجاح وبدون مشاكل!")
+    else:
+        print(f"فشل إرسال الرسالة إلى تليجرام، السبب من تليجرام: {response.text}")
+
+if __name__ == "__main__":
+    print("بدء عمل وكيل البحث العلمي...")
+    papers = fetch_arxiv_papers(SEARCH_QUERY)
+    
+    if not papers:
+        print("لم يتم العثور على مقالات جديدة.")
+    
+    for paper in papers:
+        print(f"معالجة مقال: {paper['title']}")
+        ai_output = summarize_and_translate(paper['summary'])
+        
+        message = (
+            "📚 مقال علمي جديد\n\n"
+            f"🔗 العنوان: {paper['title']}\n"
+            f"🌐 الرابط: {paper['link']}\n\n"
+            f"🤖 التحليل والترجمة:\n{ai_output}\n\n"
+            "-----------------------------------"
+        )
+        
+        send_telegram_message(message)
+    print("تم الانتهاء من تنفيذ الوكيل بالكامل!")
