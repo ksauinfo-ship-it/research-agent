@@ -2,11 +2,11 @@ import os
 import requests
 import xml.etree.ElementTree as ET
 
-# جلب الإعدادات من متغيرات البيئة (GitHub Secrets) وتخصيص البحث للقيادة التكيفية وإدارة الأعمال
+# إعدادات الحسابات والبحث (تم ضبط مصطلحات البحث لتناسب قاعدة بيانات arXiv)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-SEARCH_QUERY = os.getenv("SEARCH_QUERY", "Adaptive Leadership AND Business Administration")
+SEARCH_QUERY = os.getenv("SEARCH_QUERY", "decision support systems OR organizational management")
 
 def fetch_arxiv_papers(query):
     url = f"http://export.arxiv.org/api/query?search_query=all:{query}&max_results=3&sortBy=submittedDate&sortOrder=descending"
@@ -28,8 +28,9 @@ def fetch_arxiv_papers(query):
     return papers
 
 def summarize_and_translate(text):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-    prompt = "قم بترجمة هذا الملخص العلمي إلى اللغة العربية الفصحى بأسلوب إداري واحترافي، وقم بتلخيصه في 3 نقاط رئيسية واضحة (المشكلة الإدارية، المنهجية، النتائج القيادية):\n\n" + text
+    # تم تحديث الرابط إلى الإصدار المستقر v1 لحل مشكلة 404
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    prompt = "قم بترجمة هذا الملخص العلمي إلى اللغة العربية الفصحى بأسلوب احترافي، وقم بتلخيصه في 3 نقاط رئيسية واضحة:\n\n" + text
     
     payload = {
         "contents": [
@@ -66,7 +67,7 @@ def send_telegram_message(message):
         print(f"فشل إرسال الرسالة إلى تليجرام، السبب من تليجرام: {response.text}")
 
 if __name__ == "__main__":
-    print("بدء عمل وكيل أبحاث القيادة التكيفية وإدارة الأعمال...")
+    print("بدء عمل وكيل البحث العلمي...")
     papers = fetch_arxiv_papers(SEARCH_QUERY)
     
     if not papers:
@@ -77,12 +78,12 @@ if __name__ == "__main__":
         ai_output = summarize_and_translate(paper['summary'])
         
         message = (
-            "📊 بحث جديد في القيادة التكيفية وإدارة الأعمال\n\n"
+            "📊 بحث جديد في الإدارة والتقنية\n\n"
             f"🔗 العنوان: {paper['title']}\n"
             f"🌐 الرابط: {paper['link']}\n\n"
-            f"🤖 التحليل الإداري والترجمة:\n{ai_output}\n\n"
+            f"🤖 التحليل والترجمة:\n{ai_output}\n\n"
             "-----------------------------------"
         )
         
         send_telegram_message(message)
-    print("تم الانتهاء من تنفيذ الوكيل وإرسال المقالات الإدارية بنجاح!")
+    print("تم الانتهاء من تنفيذ الوكيل بالكامل!")
