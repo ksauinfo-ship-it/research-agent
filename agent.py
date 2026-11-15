@@ -1,17 +1,28 @@
 import os
 import requests
 
-# جلب الإعدادات والسرّيات من GitHub Secrets وتخصيص البحث للقيادة التكيفية وإدارة الأعمال
+# إعدادات الحسابات والبحث (تم جعل مصطلح البحث أقصر وأكثر مرونة لجلب نتائج مضمونة)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-SEARCH_QUERY = os.getenv("SEARCH_QUERY", "Adaptive Leadership Business Administration")
+SEARCH_QUERY = os.getenv("SEARCH_QUERY", "Adaptive Leadership")
+
+def send_telegram_message(message):
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": message
+    }
+    response = requests.post(url, json=payload)
+    if response.status_code == 200:
+        print("تم إرسال الرسالة إلى تليجرام بنجاح!")
+    else:
+        print(f"فشل إرسال الرسالة إلى تليجرام: {response.text}")
 
 def fetch_semantic_scholar_papers(query):
-    # استخدام Semantic Scholar API لجلب الأبحاث المتعلقة بالإدارة والقيادة
-    url = f"https://api.semanticscholar.org/graph/v1/paper/search?query={query}&limit=3&fields=title,abstract,paperId"
-    
+    url = f"https://api.semanticscholar.org/graph/v1/paper/search?query={query}&limit=2&fields=title,abstract,paperId"
     response = requests.get(url)
+    
     if response.status_code != 200:
         print(f"خطأ في الاتصال بـ Semantic Scholar API: {response.text}")
         return []
@@ -30,7 +41,6 @@ def fetch_semantic_scholar_papers(query):
     return papers
 
 def summarize_and_translate(text):
-    # استخدام النموذج المستقر لمعالجة وتحليل الأبحاث الإدارية
     url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
     prompt = "قم بترجمة هذا الملخص العلمي الإداري إلى اللغة العربية الفصحى بأسلوب مهني واحترافي، وقم بتلخيصه في 3 نقاط رئيسية واضحة (التحدي الإداري، المنهجية، الآثار القيادية):\n\n" + text
     
@@ -56,36 +66,26 @@ def summarize_and_translate(text):
     else:
         return f"خطأ في الاتصال بـ Gemini API: {response.text}"
 
-def send_telegram_message(message):
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": message
-    }
-    response = requests.post(url, json=payload)
-    if response.status_code == 200:
-        print("تم إرسال الرسالة إلى تليجرام بنجاح!")
-    else:
-        print(f"فشل إرسال الرسالة إلى تليجرام: {response.text}")
-
 if __name__ == "__main__":
-    print("بدء عمل وكيل أبحاث القيادة التكيفية وإدارة الأعمال...")
+    print("بدء عمل وكيل أبحاث القيادة التكيفية...")
     papers = fetch_semantic_scholar_papers(SEARCH_QUERY)
     
     if not papers:
-        print("لم يتم العثور على مقالات جديدة.")
-    
-    for paper in papers:
-        print(f"معالجة بحث: {paper['title']}")
-        ai_output = summarize_and_translate(paper['summary'])
-        
-        message = (
-            "📊 بحث جديد في القيادة التكيفية والإدارة\n\n"
-            f"🔗 العنوان: {paper['title']}\n"
-            f"🌐 الرابط: {paper['link']}\n\n"
-            f"🤖 التحليل الإداري والترجمة:\n{ai_output}\n\n"
-            "-----------------------------------"
-        )
-        
-        send_telegram_message(message)
-    print("تم الانتهاء من تنفيذ الوكيل وإرسال النتائج بنجاح!")
+        print("لم يتم العثور على مقالات، سيتم إرسال تنبيه.")
+        send_telegram_message("⚠️ بدأ الوكيل العمل ولكن لم يتم العثور على أبحاث جديدة مطابقة لهذا البحث اليوم.")
+    else:
+        for paper in papers:
+            print(f"معالجة بحث: {paper['title']}")
+            ai_output = summarize_and_translate(paper['summary'])
+            
+            message = (
+                "📊 بحث جديد في القيادة التكيفية والإدارة\n\n"
+                f"🔗 العنوان: {paper['title']}\n"
+                f"🌐 الرابط: {paper['link']}\n\n"
+                f"🤖 التحليل الإداري والترجمة:\n{ai_output}\n\n"
+                "-----------------------------------"
+            )
+            
+            send_telegram_message(message)
+            
+    print("تم الانتهاء من تنفيذ الوكيل بالكامل!")
