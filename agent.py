@@ -2,11 +2,11 @@ import os
 import requests
 import xml.etree.ElementTree as ET
 
-# جلب الإعدادات من متغيرات البيئة (GitHub Secrets)
+# جلب الإعدادات من متغيرات البيئة (GitHub Secrets) وتخصيص البحث للقيادة التكيفية وإدارة الأعمال
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-SEARCH_QUERY = os.getenv("SEARCH_QUERY", "Artificial Intelligence")
+SEARCH_QUERY = os.getenv("SEARCH_QUERY", "Adaptive Leadership AND Business Administration")
 
 def fetch_arxiv_papers(query):
     url = f"http://export.arxiv.org/api/query?search_query=all:{query}&max_results=3&sortBy=submittedDate&sortOrder=descending"
@@ -29,7 +29,7 @@ def fetch_arxiv_papers(query):
 
 def summarize_and_translate(text):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-    prompt = "قم بترجمة هذا الملخص العلمي إلى اللغة العربية الفصحى وقم بتلخيصه في 3 نقاط رئيسية واضحة (المشكلة، المنهجية، النتائج):\n\n" + text
+    prompt = "قم بترجمة هذا الملخص العلمي إلى اللغة العربية الفصحى بأسلوب إداري واحترافي، وقم بتلخيصه في 3 نقاط رئيسية واضحة (المشكلة الإدارية، المنهجية، النتائج القيادية):\n\n" + text
     
     payload = {
         "contents": [
@@ -66,7 +66,7 @@ def send_telegram_message(message):
         print(f"فشل إرسال الرسالة إلى تليجرام، السبب من تليجرام: {response.text}")
 
 if __name__ == "__main__":
-    print("بدء عمل وكيل البحث العلمي...")
+    print("بدء عمل وكيل أبحاث القيادة التكيفية وإدارة الأعمال...")
     papers = fetch_arxiv_papers(SEARCH_QUERY)
     
     if not papers:
@@ -77,12 +77,12 @@ if __name__ == "__main__":
         ai_output = summarize_and_translate(paper['summary'])
         
         message = (
-            "📚 مقال علمي جديد\n\n"
+            "📊 بحث جديد في القيادة التكيفية وإدارة الأعمال\n\n"
             f"🔗 العنوان: {paper['title']}\n"
             f"🌐 الرابط: {paper['link']}\n\n"
-            f"🤖 التحليل والترجمة:\n{ai_output}\n\n"
+            f"🤖 التحليل الإداري والترجمة:\n{ai_output}\n\n"
             "-----------------------------------"
         )
         
         send_telegram_message(message)
-    print("تم الانتهاء من تنفيذ الوكيل بالكامل!")
+    print("تم الانتهاء من تنفيذ الوكيل وإرسال المقالات الإدارية بنجاح!")
