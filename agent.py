@@ -1,36 +1,38 @@
 import os
 import requests
-import xml.etree.ElementTree as ET
 
-# إعدادات الحسابات والبحث
+# جلب الإعدادات والسرّيات من GitHub Secrets وتخصيص البحث للقيادة التكيفية وإدارة الأعمال
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-SEARCH_QUERY = os.getenv("SEARCH_QUERY", "decision support systems OR organizational management")
+SEARCH_QUERY = os.getenv("SEARCH_QUERY", "Adaptive Leadership Business Administration")
 
-def fetch_arxiv_papers(query):
-    url = f"http://export.arxiv.org/api/query?search_query=all:{query}&max_results=3&sortBy=submittedDate&sortOrder=descending"
+def fetch_semantic_scholar_papers(query):
+    # استخدام Semantic Scholar API لجلب الأبحاث المتعلقة بالإدارة والقيادة
+    url = f"https://api.semanticscholar.org/graph/v1/paper/search?query={query}&limit=3&fields=title,abstract,paperId"
+    
     response = requests.get(url)
     if response.status_code != 200:
-        print("خطأ في الاتصال بموقع arXiv")
+        print(f"خطأ في الاتصال بـ Semantic Scholar API: {response.text}")
         return []
     
-    root = ET.fromstring(response.content)
-    namespace = {'atom': 'http://www.w3.org/2005/Atom'}
+    data = response.json()
     papers = []
     
-    for entry in root.findall('atom:entry', namespace):
-        title = entry.find('atom:title', namespace).text.strip().replace('\n', ' ')
-        summary = entry.find('atom:summary', namespace).text.strip().replace('\n', ' ')
-        link = entry.find('atom:id', namespace).text
-        papers.append({"title": title, "summary": summary, "link": link})
+    for item in data.get('data', []):
+        title = item.get('title', 'بدون عنوان')
+        abstract = item.get('abstract') or "لا يوجد ملخص متاح لهذا البحث."
+        paper_id = item.get('paperId')
+        link = f"https://www.semanticscholar.org/paper/{paper_id}" if paper_id else "https://www.semanticscholar.org"
+        
+        papers.append({"title": title, "summary": abstract, "link": link})
     
     return papers
 
 def summarize_and_translate(text):
-    # استخدام نموذج gemini-pro المستقر لتجنب أخطاء 404 نهائياً
+    # استخدام النموذج المستقر لمعالجة وتحليل الأبحاث الإدارية
     url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
-    prompt = "قم بترجمة هذا الملخص العلمي إلى اللغة العربية الفصحى بأسلوب احترافي، وقم بتلخيصه في 3 نقاط رئيسية واضحة:\n\n" + text
+    prompt = "قم بترجمة هذا الملخص العلمي الإداري إلى اللغة العربية الفصحى بأسلوب مهني واحترافي، وقم بتلخيصه في 3 نقاط رئيسية واضحة (التحدي الإداري، المنهجية، الآثار القيادية):\n\n" + text
     
     payload = {
         "contents": [
@@ -62,28 +64,28 @@ def send_telegram_message(message):
     }
     response = requests.post(url, json=payload)
     if response.status_code == 200:
-        print("تم إرسال الرسالة إلى تليجرام بنجاح وبدون مشاكل!")
+        print("تم إرسال الرسالة إلى تليجرام بنجاح!")
     else:
-        print(f"فشل إرسال الرسالة إلى تليجرام، السبب من تليجرام: {response.text}")
+        print(f"فشل إرسال الرسالة إلى تليجرام: {response.text}")
 
 if __name__ == "__main__":
-    print("بدء عمل وكيل البحث العلمي...")
-    papers = fetch_arxiv_papers(SEARCH_QUERY)
+    print("بدء عمل وكيل أبحاث القيادة التكيفية وإدارة الأعمال...")
+    papers = fetch_semantic_scholar_papers(SEARCH_QUERY)
     
     if not papers:
         print("لم يتم العثور على مقالات جديدة.")
     
     for paper in papers:
-        print(f"معالجة مقال: {paper['title']}")
+        print(f"معالجة بحث: {paper['title']}")
         ai_output = summarize_and_translate(paper['summary'])
         
         message = (
-            "📊 بحث جديد في الإدارة والتقنية\n\n"
+            "📊 بحث جديد في القيادة التكيفية والإدارة\n\n"
             f"🔗 العنوان: {paper['title']}\n"
             f"🌐 الرابط: {paper['link']}\n\n"
-            f"🤖 التحليل والترجمة:\n{ai_output}\n\n"
+            f"🤖 التحليل الإداري والترجمة:\n{ai_output}\n\n"
             "-----------------------------------"
         )
         
         send_telegram_message(message)
-    print("تم الانتهاء من تنفيذ الوكيل بالكامل!")
+    print("تم الانتهاء من تنفيذ الوكيل وإرسال النتائج بنجاح!")
