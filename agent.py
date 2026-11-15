@@ -9,14 +9,12 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 SEARCH_QUERY = os.getenv("SEARCH_QUERY", "Artificial Intelligence")
 
 def fetch_arxiv_papers(query):
-    # البحث في قاعدة بيانات arXiv عن أحدث المقالات
     url = f"http://export.arxiv.org/api/query?search_query=all:{query}&max_results=3&sortBy=submittedDate&sortOrder=descending"
     response = requests.get(url)
     if response.status_code != 200:
         print("خطأ في الاتصال بموقع arXiv")
         return []
     
-    # تحليل ملف الـ XML الناتج
     root = ET.fromstring(response.content)
     namespace = {'atom': 'http://www.w3.org/2005/Atom'}
     papers = []
@@ -30,7 +28,6 @@ def fetch_arxiv_papers(query):
     return papers
 
 def summarize_and_translate(text):
-    # استخدام Gemini API للترجمة والتلخيص
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     prompt = f"قم بترجمة هذا الملخص العلمي إلى اللغة العربية الفصحى وقم بتلخيصه في 3 نقاط رئيسية واضحة (المشكلة، المنهجية، النتائج):\n\n{text}"
     
@@ -53,10 +50,14 @@ def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
-        "text": message,
-        "parse_mode": "Markdown"
+        "text": message
+        # تم إزالة parse_mode لتجنب رفض تليجرام بسبب الرموز الخاصة
     }
-    requests.post(url, json=payload)
+    response = requests.post(url, json=payload)
+    if response.status_code == 200:
+        print("تم إرسال الرسالة إلى تليجرام بنجاح وبدون مشاكل!")
+    else:
+        print(f"⚠️ فشل إرسال الرسالة إلى تليجرام، السبب من تليجرام: {response.text}")
 
 if __name__ == "__main__":
     print("بدء عمل وكيل البحث العلمي...")
@@ -69,11 +70,12 @@ if __name__ == "__main__":
         print(f"معالجة مقال: {paper['title']}")
         ai_output = summarize_and_translate(paper['summary'])
         
-        message = f"📚 *مقال علمي جديد*\n\n" \
-                  f"🔗 *العنوان:* {paper['title']}\n" \
-                  f"🌐 [رابط المقال الأصلي]({paper['link']})\n\n" \
-                  f"🤖 *التحليل والترجمة:*\n{ai_output}\n\n" \
+        # تنسيق نصي مباشر بدون رموز معقدة
+        message = f"📚 مقال علمي جديد\n\n" \
+                  f"🔗 العنوان: {paper['title']}\n" \
+                  f"🌐 الرابط: {paper['link']}\n\n" \
+                  f"🤖 التحليل والترجمة:\n{ai_output}\n\n" \
                   f"-----------------------------------"
         
         send_telegram_message(message)
-    print("تم الانتهاء بنجاح وإرسال النتائج إلى تليجرام!")
+    print("تم الانتهاء من تنفيذ الوكيل بالكامل!")
