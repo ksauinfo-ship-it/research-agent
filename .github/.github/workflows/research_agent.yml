@@ -1,0 +1,30 @@
+name: Research AI Agent
+
+on:
+  schedule:
+    # يعمل تلقائياً كل يوم الساعة 8:00 صباحاً بتوقيت UTC
+    - cron: '0 8 * * *'
+  workflow_dispatch: # يتيح لك تشغيله يدوياً في أي وقت من زرار Actions في جيت هب
+
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run agent script
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SEARCH_QUERY: "Large Language Models" # يمكنك تغيير مجال البحث هنا
+        run: python agent.py
