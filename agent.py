@@ -28,8 +28,8 @@ def fetch_arxiv_papers(query):
     return papers
 
 def summarize_and_translate(text):
-    # استخدام الإصدار الصحيح v1beta مع نموذج gemini-1.5-flash
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    # استخدام نموذج gemini-pro المستقر لتجنب أخطاء 404 نهائياً
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
     prompt = "قم بترجمة هذا الملخص العلمي إلى اللغة العربية الفصحى بأسلوب احترافي، وقم بتلخيصه في 3 نقاط رئيسية واضحة:\n\n" + text
     
     payload = {
