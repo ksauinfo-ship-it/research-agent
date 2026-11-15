@@ -2,7 +2,7 @@ import os
 import requests
 import xml.etree.ElementTree as ET
 
-# إعدادات الحسابات والبحث (تم ضبط مصطلحات البحث لتناسب قاعدة بيانات arXiv)
+# إعدادات الحسابات والبحث
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -28,8 +28,8 @@ def fetch_arxiv_papers(query):
     return papers
 
 def summarize_and_translate(text):
-    # تم تحديث الرابط إلى الإصدار المستقر v1 لحل مشكلة 404
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    # استخدام الإصدار الصحيح v1beta مع نموذج gemini-1.5-flash
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     prompt = "قم بترجمة هذا الملخص العلمي إلى اللغة العربية الفصحى بأسلوب احترافي، وقم بتلخيصه في 3 نقاط رئيسية واضحة:\n\n" + text
     
     payload = {
