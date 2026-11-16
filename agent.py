@@ -79,8 +79,8 @@ def fetch_papers(query):
     return papers[:3]
 
 def summarize_and_translate(title, text):
-    # تم التحديث إلى النموذج المدعوم والمستقر gemini-1.5-flash
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    # تم تعديل الإصدار إلى v1beta ليدعم نموذج gemini-1.5-flash بنجاح تام
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     content_to_analyze = text if len(text) > 30 else f"عنوان البحث: {title}"
     prompt = (
         "أنت مستشار أكاديمي خبير في إدارة الأعمال والقيادة التكيفية. قم بترجمة العنوان والملخص التالي إلى العربية الفصحى، "
