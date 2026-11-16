@@ -15,16 +15,23 @@ GAP_QUERY = os.getenv("GAP_QUERY", "Adaptive Leadership OR Strategic Management"
 
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": message
-    }
-    try:
-        response = requests.post(url, json=payload, timeout=15)
-        if response.status_code != 200:
-            print(f"فشل إرسال الرسالة إلى تليجرام: {response.text}", flush=True)
-    except Exception as e:
-        print(f"خطأ في الاتصال بتليجرام: {str(e)}", flush=True)
+    # تقسيم الرسالة تلقائياً إذا تجاوزت الحد الأقصى المسموح في تليجرام (4000 حرف)
+    max_length = 3800
+    chunks = [message[i:i + max_length] for i in range(0, len(message), max_length)]
+    
+    for chunk in chunks:
+        payload = {
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": chunk
+        }
+        try:
+            response = requests.post(url, json=payload, timeout=15)
+            if response.status_code != 200:
+                print(f"فشل إرسال الرسالة إلى تليجرام: {response.text}", flush=True)
+            else:
+                print("تم تسليم الرسالة إلى تليجرام بنجاح!", flush=True)
+        except Exception as e:
+            print(f"خطأ في الاتصال بتليجرام: {str(e)}", flush=True)
 
 def fetch_recent_papers(query):
     papers = []
@@ -102,33 +109,30 @@ def discover_research_gaps(title, text):
     content_to_analyze = text if len(text) > 30 else f"عنوان البحث: {title}"
     
     prompt = f"""أنت بروفيسور ومشرف أكاديمي متخصص في مناهج البحث العلمي وإدارة الأعمال والقيادة التكيفية. 
-حلل الدراسة التالية بدقة واستخرج منها الفرص البحثية لطلاب الماجستير والدكتوراه باللغة العربية الفصحى وفق الهيكل التالي:
+حلل الدراسة التالية باختصار وتركيز عالٍ (بما لا يتجاوز 250 كلمة) واستخرج منها الفرص البحثية باللغة العربية الفصحى وفق الهيكل التالي بدون أي رموز تنسيق معقدة:
 
-1. ترجمة العنوان وفكرة الدراسة باختصار شديد (سطرين).
-2. القصور أو القيود البحثية المحتملة (Limitations): ما الذي لم تغطه هذه الدراسة؟ (مثل: البيئة الجغرافية، القطاع، حجم العينة، أو المتغيرات الوسيطة).
-3. الفجوة البحثية المستنبطة (Research Gap): ما هي المنطقة المعرفية غير المستكشفة التي تفتحها هذه الدراسة؟
-4. عنوان مقترح لرسالة ماجستير أو دكتوراه مبني على هذه الفجوة (مع تحديد المتغير المستقل والتابع).
+1. فكرة الدراسة باختصار (سطرين).
+2. القصور أو القيود البحثية المحتملة (Limitations): ما الذي لم تغطه الدراسة؟
+3. الفجوة البحثية المستنبطة (Research Gap): المنطقة المعرفية غير المستكشفة.
+4. عنوان مقترح لرسالة ماجستير أو دكتوراه (مع تحديد المتغير المستقل والتابع).
 
 بيانات الدراسة:
 العنوان: {title}
 الملخص: {content_to_analyze}"""
     
-    # جلب النماذج المتاحة والمدعومة تلقائياً من حسابك
-    available_models = []
+    preferred_models = []
     try:
         for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                available_models.append(m.name)
+            if 'generateContent' in m.supported_generation_methods and 'flash' in m.name.lower():
+                preferred_models.append(m.name)
     except Exception as e:
-        print(f"خطأ أثناء جلب قائمة النماذج: {str(e)}", flush=True)
+        print(f"تنبيه جلب النماذج: {str(e)}", flush=True)
 
-    # إضافة نماذج احتياطية حديثة في حال تعذر الجلب التلقائي
-    fallback_models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest']
-    for fb in fallback_models:
-        if fb not in available_models:
-            available_models.append(fb)
+    for fb in ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-pro']:
+        if fb not in preferred_models:
+            preferred_models.append(fb)
     
-    for model_name in available_models:
+    for model_name in preferred_models[:4]:
         try:
             print(f"تحليل الفجوات باستخدام النموذج: {model_name}", flush=True)
             model = genai.GenerativeModel(model_name)
@@ -136,7 +140,7 @@ def discover_research_gaps(title, text):
             if response and response.text:
                 return response.text
         except Exception as e:
-            print(f"فشل النموذج {model_name}: {str(e)}", flush=True)
+            print(f"تجاوز {model_name}: {str(e)}", flush=True)
             continue
             
     return "⚠️ تعذر استخراج الفجوات البحثية حالياً."
@@ -159,4 +163,4 @@ if __name__ == "__main__":
                 "==================================="
             )
             send_telegram_message(message)
-    print("تم إرسال تقرير الفجوات بنجاح.", flush=True)
+    print("تمت العملية بالكامل.", flush=True)
