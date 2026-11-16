@@ -2,10 +2,10 @@ import os
 import requests
 
 try:
-import google.generativeai as genai
+    import google.generativeai as genai
 except ImportError:
-os.system("pip install google-generativeai")
-import google.generativeai as genai
+    os.system("pip install google-generativeai")
+    import google.generativeai as genai
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
@@ -89,42 +89,4 @@ def summarize_and_translate(title, text):
     content_to_analyze = text if len(text) > 30 else f"عنوان البحث: {title}"
     prompt = (
         "أنت مستشار أكاديمي خبير في إدارة الأعمال والقيادة التكيفية. قم بترجمة العنوان والملخص التالي إلى العربية الفصحى، "
-        "وقدم تحليلاً مهنياً في 3 نقاط واضحة (المشكلة الإدارية، المنهجية، التطبيق القيادي):\n\n"
-        f"العنوان: {title}\nالملخص: {content_to_analyze}"
-    )
-    
-    # استخدام النموذج المحدث والموصى به رسمياً gemini-3.8-flash مع بدائل احتياطية
-    supported_models = ['gemini-3.8-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
-    
-    for model_name in supported_models:
-        try:
-            print(جارٍ محاولة استخدام النموذج: {model_name})
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-            if response and response.text:
-                return response.text
-        except Exception as e:
-            print(f"فشل النموذج {model_name}: {str(e)}")
-            continue
-            
-    return "⚠️ تعذر توليد التحليل باستخدام النماذج المتاحة حالياً."
-
-if __name__ == "__main__":
-    print("بدء عمل وكيل أبحاث الإدارة والقيادة...")
-    papers = fetch_papers(SEARCH_QUERY)
-    
-    if not papers:
-        send_telegram_message("⚠️ بدأ الوكيل العمل ولكن لم يتم العثور على أبحاث مطابقة من أي مصدر.")
-    else:
-        for paper in papers:
-            print(f"معالجة بحث: {paper['title']}")
-            ai_output = summarize_and_translate(paper['title'], paper['summary'])
-            message = (
-                "📊 بحث محكم في الإدارة والقيادة\n\n"
-                f"🔗 العنوان: {paper['title']}\n"
-                f"🌐 الرابط: {paper['link']}\n\n"
-                f"🤖 التحليل الإداري:\n{ai_output}\n"
-                "-----------------------------------"
-            )
-            send_telegram_message(message)
-    print("تم الانتهاء من التنفيذ بنجاح.")
+        "وقدم تحليلاً مهنياً في 3 نقاط واضحة (المشكلة الإدارية
