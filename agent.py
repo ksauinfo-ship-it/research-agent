@@ -4,7 +4,7 @@ import requests
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-SCOPUS_API_KEY = os.getenv("SCOPUS_API_KEY", "") # اختيارى: مفتاح سكوبس إن وجد
+SCOPUS_API_KEY = os.getenv("SCOPUS_API_KEY", "")
 SEARCH_QUERY = os.getenv("SEARCH_QUERY", "Adaptive Leadership OR Business Administration")
 
 def send_telegram_message(message):
@@ -36,7 +36,6 @@ def fetch_papers(query):
                 for item in entries:
                     title = item.get('dc:title', 'بدون عنوان')
                     abstract = item.get('dc:description', 'بحث محكم معتمد في قاعدة بيانات Scopus.')
-                    # استخراج رابط البحث
                     link = ""
                     for link_item in item.get('link', []):
                         if link_item.get('@ref') == 'scopus':
@@ -45,7 +44,7 @@ def fetch_papers(query):
         except Exception as e:
             print(f"خطأ في الاتصال بـ Scopus: {str(e)}")
 
-    # 2. البحث عبر Semantic Scholar (إذا لم توجد نتائج كافية)
+    # 2. البحث عبر Semantic Scholar
     if len(papers) < 2:
         print("جاري البحث في Semantic Scholar...")
         ss_url = "https://api.semanticscholar.org/graph/v1/paper/search"
@@ -80,7 +79,8 @@ def fetch_papers(query):
     return papers[:3]
 
 def summarize_and_translate(title, text):
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
+    # تم التحديث إلى النموذج المدعوم والمستقر gemini-1.5-flash
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     content_to_analyze = text if len(text) > 30 else f"عنوان البحث: {title}"
     prompt = (
         "أنت مستشار أكاديمي خبير في إدارة الأعمال والقيادة التكيفية. قم بترجمة العنوان والملخص التالي إلى العربية الفصحى، "
@@ -110,7 +110,7 @@ if __name__ == "__main__":
             print(f"معالجة بحث: {paper['title']}")
             ai_output = summarize_and_translate(paper['title'], paper['summary'])
             message = (
-                "📊 بحث محكم في الإدارة والقيادة (Scopus / Academic)\n\n"
+                "📊 بحث محكم في الإدارة والقيادة\n\n"
                 f"🔗 العنوان: {paper['title']}\n"
                 f"🌐 الرابط: {paper['link']}\n\n"
                 f"🤖 التحليل الإداري:\n{ai_output}\n"
