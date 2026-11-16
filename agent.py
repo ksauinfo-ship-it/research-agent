@@ -1,6 +1,13 @@
 import os
 import requests
 
+# استخدام مكتبة جوجل الرسمية لتجنب مشاكل الروابط والإصدارات نهائياً
+try:
+    import google.generativeai as genai
+except ImportError:
+    os.system("pip install google-generativeai")
+    import google.generativeai as genai
+
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -79,25 +86,19 @@ def fetch_papers(query):
     return papers[:3]
 
 def summarize_and_translate(title, text):
-    # تم تعديل الإصدار إلى v1beta ليدعم نموذج gemini-1.5-flash بنجاح تام
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-    content_to_analyze = text if len(text) > 30 else f"عنوان البحث: {title}"
-    prompt = (
-        "أنت مستشار أكاديمي خبير في إدارة الأعمال والقيادة التكيفية. قم بترجمة العنوان والملخص التالي إلى العربية الفصحى، "
-        "وقدم تحليلاً مهنياً في 3 نقاط واضحة (المشكلة الإدارية، المنهجية، التطبيق القيادي):\n\n"
-        f"العنوان: {title}\nالملخص: {content_to_analyze}"
-    )
-    
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
-    response = requests.post(url, json=payload)
-    
-    if response.status_code == 200:
-        try:
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
-        except Exception as e:
-            return f"خطأ في قراءة رد Gemini: {str(e)}"
-    else:
-        return f"خطأ من Gemini ({response.status_code}): {response.text}"
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        content_to_analyze = text if len(text) > 30 else f"عنوان البحث: {title}"
+        prompt = (
+            "أنت مستشار أكاديمي خبير في إدارة الأعمال والقيادة التكيفية. قم بترجمة العنوان والملخص التالي إلى العربية الفصحى، "
+            "وقدم تحليلاً مهنياً في 3 نقاط واضحة (المشكلة الإدارية، المنهجية، التطبيق القيادي):\n\n"
+            f"العنوان: {title}\nالملخص: {content_to_analyze}"
+        )
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"خطأ في توليد التحليل عبر Gemini SDK: {str(e)}"
 
 if __name__ == "__main__":
     print("بدء عمل وكيل أبحاث الإدارة والقيادة...")
