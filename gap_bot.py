@@ -29,7 +29,7 @@ def send_telegram_message(message):
 def fetch_recent_papers(query):
     papers = []
     
-    # 1. البحث عبر Scopus API مع مهلة زمنية 15 ثانية
+    # 1. البحث عبر Scopus API
     if SCOPUS_API_KEY:
         print("جاري البحث في Scopus لاستخراج الفجوات...", flush=True)
         scopus_url = "https://api.elsevier.com/content/search/scopus"
@@ -51,9 +51,9 @@ def fetch_recent_papers(query):
                             link = link_item.get('@href')
                     papers.append({"title": title, "summary": abstract, "link": link or "https://www.scopus.com"})
         except Exception as e:
-            print(f"تجاوز Scopus بسبب البطء أو الخطأ: {str(e)}", flush=True)
+            print(f"تجاوز Scopus: {str(e)}", flush=True)
 
-    # 2. البحث عبر Semantic Scholar مع مهلة زمنية 15 ثانية
+    # 2. البحث عبر Semantic Scholar
     if len(papers) < 2:
         print("جاري البحث في Semantic Scholar...", flush=True)
         ss_url = "https://api.semanticscholar.org/graph/v1/paper/search"
@@ -75,9 +75,9 @@ def fetch_recent_papers(query):
                         if len(papers) >= 2:
                             break
         except Exception as e:
-            print(f"تجاوز Semantic Scholar بسبب البطء: {str(e)}", flush=True)
+            print(f"تجاوز Semantic Scholar: {str(e)}", flush=True)
                 
-    # 3. المصدر الاحتياطي Crossref مع مهلة زمنية 15 ثانية
+    # 3. المصدر الاحتياطي Crossref
     if not papers:
         print("التحويل للمصدر الاحتياطي Crossref...", flush=True)
         cr_url = "https://api.crossref.org/works"
@@ -113,9 +113,22 @@ def discover_research_gaps(title, text):
 العنوان: {title}
 الملخص: {content_to_analyze}"""
     
-    supported_models = ['gemini-3.8-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
+    # جلب النماذج المتاحة والمدعومة تلقائياً من حسابك
+    available_models = []
+    try:
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                available_models.append(m.name)
+    except Exception as e:
+        print(f"خطأ أثناء جلب قائمة النماذج: {str(e)}", flush=True)
+
+    # إضافة نماذج احتياطية حديثة في حال تعذر الجلب التلقائي
+    fallback_models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest']
+    for fb in fallback_models:
+        if fb not in available_models:
+            available_models.append(fb)
     
-    for model_name in supported_models:
+    for model_name in available_models:
         try:
             print(f"تحليل الفجوات باستخدام النموذج: {model_name}", flush=True)
             model = genai.GenerativeModel(model_name)
