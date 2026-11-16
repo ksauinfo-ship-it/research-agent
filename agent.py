@@ -1,7 +1,6 @@
 import os
 import requests
 
-# استخدام مكتبة جوجل الرسمية لتجنب مشاكل الروابط والإصدارات نهائياً
 try:
     import google.generativeai as genai
 except ImportError:
@@ -86,19 +85,28 @@ def fetch_papers(query):
     return papers[:3]
 
 def summarize_and_translate(title, text):
-    try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        content_to_analyze = text if len(text) > 30 else f"عنوان البحث: {title}"
-        prompt = (
-            "أنت مستشار أكاديمي خبير في إدارة الأعمال والقيادة التكيفية. قم بترجمة العنوان والملخص التالي إلى العربية الفصحى، "
-            "وقدم تحليلاً مهنياً في 3 نقاط واضحة (المشكلة الإدارية، المنهجية، التطبيق القيادي):\n\n"
-            f"العنوان: {title}\nالملخص: {content_to_analyze}"
-        )
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        return f"خطأ في توليد التحليل عبر Gemini SDK: {str(e)}"
+    genai.configure(api_key=GEMINI_API_KEY)
+    content_to_analyze = text if len(text) > 30 else f"عنوان البحث: {title}"
+    prompt = (
+        "أنت مستشار أكاديمي خبير في إدارة الأعمال والقيادة التكيفية. قم بترجمة العنوان والملخص التالي إلى العربية الفصحى، "
+        "وقدم تحليلاً مهنياً في 3 نقاط واضحة (المشكلة الإدارية، المنهجية، التطبيق القيادي):\n\n"
+        f"العنوان: {title}\nالملخص: {content_to_analyze}"
+    )
+    
+    # قائمة النماذج للاختبار بالتتابع لضمان عدم حدوث خطأ 404 نهائياً
+    models_to_try = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
+    
+    for model_name in models_to_try:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            if response and response.text:
+                return response.text
+        except Exception as e:
+            print(f"المحاولة بالنموذج {model_name} فشلت: {str(e)}")
+            continue
+            
+    return "⚠️ تعذر توليد التحليل باستخدام نماذج Gemini المتاحة حالياً."
 
 if __name__ == "__main__":
     print("بدء عمل وكيل أبحاث الإدارة والقيادة...")
