@@ -1,11 +1,11 @@
 import os
 import requests
 
-# إعدادات الحسابات والبحث (تم جعل مصطلح البحث أقصر وأكثر مرونة لجلب نتائج مضمونة)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-SEARCH_QUERY = os.getenv("SEARCH_QUERY", "Adaptive Leadership")
+SCOPUS_API_KEY = os.getenv("SCOPUS_API_KEY", "") # اختيارى: مفتاح سكوبس إن وجد
+SEARCH_QUERY = os.getenv("SEARCH_QUERY", "Adaptive Leadership OR Business Administration")
 
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -14,78 +14,107 @@ def send_telegram_message(message):
         "text": message
     }
     response = requests.post(url, json=payload)
-    if response.status_code == 200:
-        print("تم إرسال الرسالة إلى تليجرام بنجاح!")
-    else:
+    if response.status_code != 200:
         print(f"فشل إرسال الرسالة إلى تليجرام: {response.text}")
 
-def fetch_semantic_scholar_papers(query):
-    url = f"https://api.semanticscholar.org/graph/v1/paper/search?query={query}&limit=2&fields=title,abstract,paperId"
-    response = requests.get(url)
-    
-    if response.status_code != 200:
-        print(f"خطأ في الاتصال بـ Semantic Scholar API: {response.text}")
-        return []
-    
-    data = response.json()
+def fetch_papers(query):
     papers = []
     
-    for item in data.get('data', []):
-        title = item.get('title', 'بدون عنوان')
-        abstract = item.get('abstract') or "لا يوجد ملخص متاح لهذا البحث."
-        paper_id = item.get('paperId')
-        link = f"https://www.semanticscholar.org/paper/{paper_id}" if paper_id else "https://www.semanticscholar.org"
-        
-        papers.append({"title": title, "summary": abstract, "link": link})
-    
-    return papers
+    # 1. البحث عبر Scopus API (إذا توفر المفتاح)
+    if SCOPUS_API_KEY:
+        print("جاري البحث في مستوعب Scopus العالمي...")
+        scopus_url = "https://api.elsevier.com/content/search/scopus"
+        scopus_headers = {
+            "X-ELS-APIKey": SCOPUS_API_KEY,
+            "Accept": "application/json"
+        }
+        scopus_params = {"query": query, "count": 2}
+        try:
+            scopus_res = requests.get(scopus_url, headers=scopus_headers, params=scopus_params)
+            if scopus_res.status_code == 200:
+                entries = scopus_res.json().get('search-results', {}).get('entry', [])
+                for item in entries:
+                    title = item.get('dc:title', 'بدون عنوان')
+                    abstract = item.get('dc:description', 'بحث محكم معتمد في قاعدة بيانات Scopus.')
+                    # استخراج رابط البحث
+                    link = ""
+                    for link_item in item.get('link', []):
+                        if link_item.get('@ref') == 'scopus':
+                            link = link_item.get('@href')
+                    papers.append({"title": title, "summary": abstract, "link": link or "https://www.scopus.com"})
+        except Exception as e:
+            print(f"خطأ في الاتصال بـ Scopus: {str(e)}")
 
-def summarize_and_translate(text):
+    # 2. البحث عبر Semantic Scholar (إذا لم توجد نتائج كافية)
+    if len(papers) < 2:
+        print("جاري البحث في Semantic Scholar...")
+        ss_url = "https://api.semanticscholar.org/graph/v1/paper/search"
+        ss_params = {"query": query, "limit": 2, "fields": "title,abstract,paperId"}
+        ss_res = requests.get(ss_url, params=ss_params)
+        
+        if ss_res.status_code == 200:
+            for item in ss_res.json().get('data', []):
+                title = item.get('title', 'بدون عنوان')
+                abstract = item.get('abstract') or ""
+                paper_id = item.get('paperId')
+                link = f"https://www.semanticscholar.org/paper/{paper_id}" if paper_id else ""
+                if title and not any(p['title'] == title for p in papers):
+                    papers.append({"title": title, "summary": abstract, "link": link})
+                
+    # 3. المصدر الاحتياطي الأخير Crossref
+    if not papers:
+        print("التحويل للمصدر الأكاديمي الاحتياطي Crossref...")
+        cr_url = "https://api.crossref.org/works"
+        cr_params = {"query": query, "rows": 2, "sort": "published", "order": "desc"}
+        cr_res = requests.get(cr_url, params=cr_params)
+        
+        if cr_res.status_code == 200:
+            items = cr_res.json().get('message', {}).get('items', [])
+            for item in items:
+                title_list = item.get('title', [])
+                title = title_list[0] if title_list else "بدون عنوان"
+                abstract = item.get('abstract', 'بحث علمي حديث في مجال الإدارة والأعمال.')
+                link = item.get('URL', '')
+                papers.append({"title": title, "summary": abstract, "link": link})
+
+    return papers[:3]
+
+def summarize_and_translate(title, text):
     url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
-    prompt = "قم بترجمة هذا الملخص العلمي الإداري إلى اللغة العربية الفصحى بأسلوب مهني واحترافي، وقم بتلخيصه في 3 نقاط رئيسية واضحة (التحدي الإداري، المنهجية، الآثار القيادية):\n\n" + text
+    content_to_analyze = text if len(text) > 30 else f"عنوان البحث: {title}"
+    prompt = (
+        "أنت مستشار أكاديمي خبير في إدارة الأعمال والقيادة التكيفية. قم بترجمة العنوان والملخص التالي إلى العربية الفصحى، "
+        "وقدم تحليلاً مهنياً في 3 نقاط واضحة (المشكلة الإدارية، المنهجية، التطبيق القيادي):\n\n"
+        f"العنوان: {title}\nالملخص: {content_to_analyze}"
+    )
     
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {
-                        "text": prompt
-                    }
-                ]
-            }
-        ]
-    }
-    
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
     response = requests.post(url, json=payload)
+    
     if response.status_code == 200:
         try:
-            result = response.json()
-            return result['candidates'][0]['content']['parts'][0]['text']
+            return response.json()['candidates'][0]['content']['parts'][0]['text']
         except Exception as e:
-            return f"خطأ في تحليل استجابة الذكاء الاصطناعي: {str(e)}"
+            return f"خطأ في قراءة رد Gemini: {str(e)}"
     else:
-        return f"خطأ في الاتصال بـ Gemini API: {response.text}"
+        return f"خطأ من Gemini ({response.status_code}): {response.text}"
 
 if __name__ == "__main__":
-    print("بدء عمل وكيل أبحاث القيادة التكيفية...")
-    papers = fetch_semantic_scholar_papers(SEARCH_QUERY)
+    print("بدء عمل وكيل أبحاث الإدارة والقيادة...")
+    papers = fetch_papers(SEARCH_QUERY)
     
     if not papers:
-        print("لم يتم العثور على مقالات، سيتم إرسال تنبيه.")
-        send_telegram_message("⚠️ بدأ الوكيل العمل ولكن لم يتم العثور على أبحاث جديدة مطابقة لهذا البحث اليوم.")
+        send_telegram_message("⚠️ بدأ الوكيل العمل ولكن لم يتم العثور على أبحاث مطابقة من أي مصدر.")
     else:
         for paper in papers:
             print(f"معالجة بحث: {paper['title']}")
-            ai_output = summarize_and_translate(paper['summary'])
-            
+            ai_output = summarize_and_translate(paper['title'], paper['summary'])
             message = (
-                "📊 بحث جديد في القيادة التكيفية والإدارة\n\n"
+                "📊 بحث محكم في الإدارة والقيادة (Scopus / Academic)\n\n"
                 f"🔗 العنوان: {paper['title']}\n"
                 f"🌐 الرابط: {paper['link']}\n\n"
-                f"🤖 التحليل الإداري والترجمة:\n{ai_output}\n\n"
+                f"🤖 التحليل الإداري:\n{ai_output}\n"
                 "-----------------------------------"
             )
-            
             send_telegram_message(message)
-            
-    print("تم الانتهاء من تنفيذ الوكيل بالكامل!")
+    print("تم الانتهاء من التنفيذ بنجاح.")
