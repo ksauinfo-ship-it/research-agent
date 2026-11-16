@@ -11,7 +11,6 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 SCOPUS_API_KEY = os.getenv("SCOPUS_API_KEY", "")
-# تم تخصيص كلمات البحث بدقة لتناسب الإدارة والقيادة
 SEARCH_QUERY = os.getenv("SEARCH_QUERY", "Adaptive Leadership OR Strategic Management OR Business Administration")
 
 def send_telegram_message(message):
@@ -94,27 +93,21 @@ def summarize_and_translate(title, text):
         f"العنوان: {title}\nالملخص: {content_to_analyze}"
     )
     
-    try:
-        # البحث التلقائي عن أول نموذج متاح لحسابك يدعم توليد المحتوى
-        available_models = []
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                available_models.append(m.name)
-        
-        if not available_models:
-            return "⚠️ لم يتم العثور على أي نموذج مدعوم لتوليد المحتوى."
-        
-        chosen_model = available_models[0]
-        print(f"استخدام النموذج المتاح: {chosen_model}")
-        
-        model = genai.GenerativeModel(chosen_model)
-        response = model.generate_content(prompt)
-        if response and response.text:
-            return response.text
-    except Exception as e:
-        return f"خطأ أثناء توليد التحليل: {str(e)}"
-        
-    return "⚠️ تعذر توليد التحليل."
+    # قائمة النماذج الرسمية المستقرة مرتبة للاختبار التلقائي
+    stable_models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
+    
+    for model_name in stable_models:
+        try:
+            print(f"جرب النموذج: {model_name}")
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            if response and response.text:
+                return response.text
+        except Exception as e:
+            print(f"فشل النموذج {model_name}: {str(e)}")
+            continue
+            
+    return "⚠️ تعذر توليد التحليل باستخدام النماذج المتاحة حالياً."
 
 if __name__ == "__main__":
     print("بدء عمل وكيل أبحاث الإدارة والقيادة...")
