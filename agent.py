@@ -2,10 +2,10 @@ import os
 import requests
 
 try:
-    import google.generativeai as genai
+import google.generativeai as genai
 except ImportError:
-    os.system("pip install google-generativeai")
-    import google.generativeai as genai
+os.system("pip install google-generativeai")
+import google.generativeai as genai
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
@@ -93,12 +93,12 @@ def summarize_and_translate(title, text):
         f"العنوان: {title}\nالملخص: {content_to_analyze}"
     )
     
-    # قائمة النماذج الرسمية المستقرة مرتبة للاختبار التلقائي
-    stable_models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
+    # استخدام النموذج المحدث والموصى به رسمياً gemini-3.8-flash مع بدائل احتياطية
+    supported_models = ['gemini-3.8-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
     
-    for model_name in stable_models:
+    for model_name in supported_models:
         try:
-            print(f"جرب النموذج: {model_name}")
+            print(جارٍ محاولة استخدام النموذج: {model_name})
             model = genai.GenerativeModel(model_name)
             response = model.generate_content(prompt)
             if response and response.text:
