@@ -12,7 +12,12 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 SCOPUS_API_KEY = os.getenv("SCOPUS_API_KEY", "")
-RISK_QUERY = os.getenv("RISK_QUERY", '"Risk Management Behavior" OR "Risk-Taking Behavior" AND Management')
+
+# حصر البحث في تخصص إدارة الأعمال (BUSI) داخل سكوبس
+RISK_QUERY = os.getenv(
+    "RISK_QUERY",
+    '("Risk Management Behavior" OR "Risk-Taking Behavior" OR "Risk Behavior") AND ("Business Administration" OR "Organizational" OR "Corporate" OR "Enterprise") AND SUBJAREA(BUSI)'
+)
 
 def clean_html(raw_html):
     if not raw_html:
@@ -42,9 +47,9 @@ def send_telegram_message(message):
 def fetch_risk_papers(query):
     papers = []
     
-    # 1. البحث عبر Scopus API (يوفر الدولة، الجامعة، المجلة، التاريخ، والمستخلص)
+    # 1. البحث عبر Scopus API (محصور في تخصص إدارة الأعمال BUSI)
     if SCOPUS_API_KEY:
-        print("جاري البحث في Scopus عن دراسات سلوك إدارة المخاطر...", flush=True)
+        print("جاري البحث في Scopus (تخصص إدارة الأعمال) عن سلوك إدارة المخاطر...", flush=True)
         scopus_url = "https://api.elsevier.com/content/search/scopus"
         scopus_headers = {
             "X-ELS-APIKey": SCOPUS_API_KEY,
@@ -63,7 +68,6 @@ def fetch_risk_papers(query):
                     author = item.get('dc:creator', 'غير محدد')
                     doi = item.get('prism:doi', 'لا يوجد')
                     
-                    # استخراج الدولة والجهة من بيانات الانتماء المؤسسي
                     affiliations = item.get('affiliation', [])
                     country = "غير محدد"
                     inst = "غير محدد"
@@ -89,12 +93,13 @@ def fetch_risk_papers(query):
         except Exception as e:
             print(f"تجاوز Scopus: {str(e)}", flush=True)
 
-    # 2. البحث عبر Semantic Scholar
+    # 2. البحث عبر Semantic Scholar مع تقييد النطاق بإدارة الأعمال
     if len(papers) < 2:
-        print("جاري البحث في Semantic Scholar...", flush=True)
+        print("جاري البحث في Semantic Scholar (إدارة الأعمال)...", flush=True)
         ss_url = "https://api.semanticscholar.org/graph/v1/paper/search"
         ss_params = {
-            "query": "Risk Management Behavior",
+            "query": "Risk Management Behavior Business Administration Corporate",
+            "fieldsOfStudy": "Business",
             "limit": 4,
             "fields": "title,abstract,venue,year,publicationDate,authors,externalIds,paperId"
         }
@@ -107,7 +112,7 @@ def fetch_risk_papers(query):
                     if len(abstract) > 50 and not any(p['title'] == title for p in papers):
                         authors_list = [a.get('name') for a in item.get('authors', [])[:3]]
                         author = ", ".join(authors_list) if authors_list else "غير محدد"
-                        journal = item.get('venue') or "مجلة علمية محكمة"
+                        journal = item.get('venue') or "مجلة علمية محكمة في إدارة الأعمال"
                         pub_date = item.get('publicationDate') or str(item.get('year', 'غير محدد'))
                         doi = item.get('externalIds', {}).get('DOI', 'لا يوجد')
                         paper_id = item.get('paperId')
@@ -128,11 +133,16 @@ def fetch_risk_papers(query):
         except Exception as e:
             print(f"تجاوز Semantic Scholar: {str(e)}", flush=True)
 
-    # 3. المصدر الاحتياطي Crossref
+    # 3. المصدر الاحتياطي Crossref مع تركيز إدارة الأعمال
     if not papers:
-        print("التحويل للمصدر الاحتياطي Crossref...", flush=True)
+        print("التحويل للمصدر الاحتياطي Crossref (إدارة الأعمال)...", flush=True)
         cr_url = "https://api.crossref.org/works"
-        cr_params = {"query": "Risk Management Behavior", "rows": 2, "sort": "published", "order": "desc"}
+        cr_params = {
+            "query": "Risk Management Behavior Business Administration Corporate",
+            "rows": 2,
+            "sort": "published",
+            "order": "desc"
+        }
         try:
             cr_res = requests.get(cr_url, params=cr_params, timeout=15)
             if cr_res.status_code == 200:
@@ -140,7 +150,7 @@ def fetch_risk_papers(query):
                 for item in items:
                     title_list = item.get('title', [])
                     title = title_list[0] if title_list else "بدون عنوان"
-                    abstract = clean_html(item.get('abstract', '')) or "دراسة حديثة حول سلوك إدارة المخاطر."
+                    abstract = clean_html(item.get('abstract', '')) or "دراسة حديثة حول سلوك إدارة المخاطر في إدارة الأعمال."
                     journal_list = item.get('container-title', [])
                     journal = journal_list[0] if journal_list else "غير محدد"
                     date_parts = item.get('published', {}).get('date-parts', [[None]])[0]
@@ -168,8 +178,8 @@ def fetch_risk_papers(query):
 def translate_and_format_details(paper):
     genai.configure(api_key=GEMINI_API_KEY)
     
-    prompt = f"""أنت مترجم وباحث أكاديمي متخصص في إدارة المخاطر والعلوم الإدارية.
-لديك البيانات الوصفية التالية لدراسة علمية حول "سلوك إدارة المخاطر". 
+    prompt = f"""أنت مترجم وباحث أكاديمي متخصص في إدارة الأعمال وإدارة المخاطر المؤسسية.
+لديك البيانات الوصفية التالية لدراسة علمية حول "سلوك إدارة المخاطر" في مجال إدارة الأعمال. 
 المطلوب: ترجمة كافة البيانات بدقة واحترافية إلى اللغة العربية الفصحى، واستنتاج الدولة/بلد النشر أو الانتماء من اسم المجلة أو الجهة إن أمكن، وتقديمها في بطاقة تعريفية منظمة وواضحة بدون أي رموز تنسيق معقدة (مثل النجمتين) وفق القالب التالي تماماً:
 
 1. العنوان المترجم:
@@ -180,7 +190,7 @@ def translate_and_format_details(paper):
 6. الدولة / الانتماء المؤسسي:
 7. معرف الوثيقة (DOI):
 8. ترجمة المستخلص (Abstract) بالكامل وبأسلوب أكاديمي رصين:
-9. أبرز نتائج أو تطبيقات الدراسة في سلوك إدارة المخاطر (في سطرين):
+9. أبرز نتائج أو تطبيقات الدراسة في إدارة الأعمال وسلوك إدارة المخاطر (في سطرين):
 
 البيانات الخام للدراسة:
 - العنوان: {paper['title']}
@@ -217,17 +227,17 @@ def translate_and_format_details(paper):
     return "⚠️ تعذر ترجمة التفاصيل آلياً في الوقت الحالي."
 
 if __name__ == "__main__":
-    print("بدء تشغيل وكيل رصد سلوك إدارة المخاطر...", flush=True)
+    print("بدء تشغيل وكيل رصد سلوك إدارة المخاطر (إدارة الأعمال)...", flush=True)
     papers = fetch_risk_papers(RISK_QUERY)
     
     if not papers:
-        send_telegram_message("⚠️ لم يتم العثور على دراسات جديدة حول سلوك إدارة المخاطر اليوم.")
+        send_telegram_message("⚠️ لم يتم العثور على دراسات جديدة حول سلوك إدارة المخاطر في إدارة الأعمال اليوم.")
     else:
         for paper in papers:
             print(f"معالجة دراسة: {paper['title']}", flush=True)
             formatted_report = translate_and_format_details(paper)
             message = (
-                "🛡️ راصد دراسات سلوك إدارة المخاطر\n\n"
+                "🛡️ راصد دراسات سلوك إدارة المخاطر (إدارة الأعمال)\n\n"
                 f"{formatted_report}\n\n"
                 f"🔗 الرابط المباشر للدراسة:\n{paper['link']}\n"
                 "==================================="
