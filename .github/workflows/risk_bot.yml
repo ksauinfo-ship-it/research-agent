@@ -1,0 +1,33 @@
+name: Risk Management Behavior Bot
+
+on:
+  workflow_dispatch:
+  schedule:
+    # يعمل تلقائياً مرتين أسبوعياً (الاثنين والخميس الساعة 11 صباحاً بتوقيت السعودية)
+    - cron: '0 8 * * 1,4'
+
+jobs:
+  fetch-risk-research:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests google-generativeai
+
+      - name: Run Risk Bot script
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SCOPUS_API_KEY: ${{ secrets.SCOPUS_API_KEY }}
+        run: python risk_bot.py
